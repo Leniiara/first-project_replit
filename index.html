@@ -11,6 +11,7 @@
       <h1>Управление задачами руководителя</h1>
       <div class="header-controls">
         <p id="user-badge" class="user-badge"></p>
+        <div id="app-messages" class="messages" aria-live="polite"></div>
         <div class="role-switch">
           <label for="role-switch-select">Режим просмотра</label>
           <div class="role-switch-row">
@@ -33,10 +34,27 @@
         <textarea id="task-text" rows="3" placeholder="Текст появится после распознавания речи..."></textarea>
 
         <label for="task-topic">Тема</label>
-        <select id="task-topic"></select>
+        <div class="field-row">
+          <select id="task-topic" class="field-row-select"></select>
+          <button type="button" id="topic-minus" class="icon-btn" title="Удалить выбранную тему" aria-label="Удалить тему">
+            −
+          </button>
+          <button type="button" id="topic-plus" class="icon-btn" title="Добавить тему" aria-label="Добавить тему">+</button>
+        </div>
+        <input type="text" id="new-topic-input" class="inline-input-below" placeholder="Новая тема — введите и нажмите +" />
 
         <label for="task-assignee">Исполнитель</label>
-        <select id="task-assignee"></select>
+        <div class="field-row">
+          <select id="task-assignee" class="field-row-select"></select>
+          <button type="button" id="performer-minus" class="icon-btn" title="Удалить выбранного исполнителя" aria-label="Удалить исполнителя">
+            −
+          </button>
+          <button type="button" id="performer-plus" class="icon-btn" title="Добавить исполнителя" aria-label="Добавить исполнителя">
+            +
+          </button>
+        </div>
+        <input type="text" id="new-performer-input" class="inline-input-below" placeholder="ФИО исполнителя — введите и нажмите +" />
+        <p id="assignee-invite-hint" class="invite-hint"></p>
 
         <button id="send-task-btn" class="primary" type="button">Отправить задачу</button>
       </section>
