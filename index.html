@@ -9,7 +9,16 @@
   <body>
     <header class="app-header">
       <h1>Управление задачами руководителя</h1>
-      <p id="user-badge" class="user-badge"></p>
+      <div class="header-controls">
+        <p id="user-badge" class="user-badge"></p>
+        <div class="role-switch">
+          <label for="role-switch-select">Режим просмотра</label>
+          <div class="role-switch-row">
+            <select id="role-switch-select"></select>
+            <button id="role-switch-btn" type="button">Переключить</button>
+          </div>
+        </div>
+      </div>
     </header>
 
     <main class="layout">

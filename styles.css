@@ -26,6 +26,42 @@ body {
   opacity: 0.9;
 }
 
+.header-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.role-switch {
+  min-width: 280px;
+}
+
+.role-switch label {
+  margin: 0 0 6px;
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.role-switch-row {
+  display: flex;
+  gap: 8px;
+}
+
+.role-switch-row select {
+  width: 100%;
+}
+
+.role-switch-row button {
+  width: auto;
+  white-space: nowrap;
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+}
+
 .layout {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
