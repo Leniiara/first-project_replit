@@ -1,31 +1,44 @@
 const APP_STORAGE_KEY = "manager-task-v1";
+const CATALOG_STORAGE_KEY = "manager-task-v1-catalog";
 
-const TOPICS = [
+const MANAGER = { id: "imbitsalov", name: "Имбицалов И.И.", role: "manager", token: "inv-manager-001" };
+
+const DEFAULT_TOPICS = [
   "убрать навоз крупного скота",
   "заглушить мотор трактара",
   "посееть то, что по итогу пожнешь",
   "открыть двери представителю иных земель",
 ];
 
-const USERS = [
-  { id: "imbitsalov", name: "Имбицалов И.И.", role: "manager", token: "inv-manager-001" },
-  { id: "grehovnik", name: "Греховник А.А.", role: "performer", token: "inv-grehovnik-001" },
-  { id: "zabiyaka", name: "Забияка В.В", role: "performer", token: "inv-zabiyaka-001" },
-  { id: "loshkatova", name: "Лошкатова С.С.", role: "performer", token: "inv-loshkatova-001" },
-  { id: "tupankova", name: "Тупанкова Л.Л.", role: "performer", token: "inv-tupankova-001" },
+const DEFAULT_PERFORMERS = [
+  { id: "grehovnik", name: "Греховник А.А.", token: "inv-grehovnik-001" },
+  { id: "zabiyaka", name: "Забияка В.В", token: "inv-zabiyaka-001" },
+  { id: "loshkatova", name: "Лошкатова С.С.", token: "inv-loshkatova-001" },
+  { id: "tupankova", name: "Тупанкова Л.Л.", token: "inv-tupankova-001" },
 ];
 
 const STATE = {
   currentUser: null,
   tasks: [],
+  catalog: { topics: [], performers: [] },
   selectedTaskId: null,
   filter: "active",
 };
 
+let messageTimer = null;
+
 const el = {
+  appMessages: document.getElementById("app-messages"),
   userBadge: document.getElementById("user-badge"),
   roleSwitchSelect: document.getElementById("role-switch-select"),
   roleSwitchBtn: document.getElementById("role-switch-btn"),
+  topicMinus: document.getElementById("topic-minus"),
+  topicPlus: document.getElementById("topic-plus"),
+  performerMinus: document.getElementById("performer-minus"),
+  performerPlus: document.getElementById("performer-plus"),
+  newTopicInput: document.getElementById("new-topic-input"),
+  newPerformerInput: document.getElementById("new-performer-input"),
+  assigneeInviteHint: document.getElementById("assignee-invite-hint"),
   quickCreateScreen: document.getElementById("quick-create-screen"),
   taskText: document.getElementById("task-text"),
   taskTopic: document.getElementById("task-topic"),
@@ -43,6 +56,7 @@ const el = {
 init();
 
 function init() {
+  STATE.catalog = loadCatalog();
   STATE.currentUser = resolveUserFromInvite();
   STATE.tasks = loadTasks();
   fillSelects();
@@ -51,33 +65,91 @@ function init() {
   renderApp();
 }
 
+function getPerformers() {
+  return STATE.catalog.performers;
+}
+
+function getAllUsers() {
+  return [MANAGER, ...getPerformers().map((p) => ({ ...p, role: "performer" }))];
+}
+
+function loadCatalog() {
+  const raw = localStorage.getItem(CATALOG_STORAGE_KEY);
+  if (!raw) {
+    return {
+      topics: [...DEFAULT_TOPICS],
+      performers: DEFAULT_PERFORMERS.map((p) => ({ ...p })),
+    };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const topics = Array.isArray(parsed.topics) && parsed.topics.length ? parsed.topics : [...DEFAULT_TOPICS];
+    const performers =
+      Array.isArray(parsed.performers) && parsed.performers.length
+        ? parsed.performers.map((p) => ({ id: p.id, name: p.name, token: p.token }))
+        : DEFAULT_PERFORMERS.map((p) => ({ ...p }));
+    return { topics, performers };
+  } catch {
+    return {
+      topics: [...DEFAULT_TOPICS],
+      performers: DEFAULT_PERFORMERS.map((p) => ({ ...p })),
+    };
+  }
+}
+
+function saveCatalog() {
+  localStorage.setItem(
+    CATALOG_STORAGE_KEY,
+    JSON.stringify({
+      topics: STATE.catalog.topics,
+      performers: STATE.catalog.performers,
+    }),
+  );
+}
+
 function resolveUserFromInvite() {
   const params = new URLSearchParams(window.location.search);
   const token = params.get("invite");
-  const matched = USERS.find((u) => u.token === token);
+  const matched = getAllUsers().find((u) => u.token === token);
   if (matched) return matched;
-  return USERS[0];
+  return MANAGER;
 }
 
 function fillSelects() {
-  el.taskTopic.innerHTML = TOPICS.map((topic) => `<option value="${topic}">${topic}</option>`).join("");
-  const performerOptions = USERS.filter((u) => u.role === "performer")
-    .map((u) => `<option value="${u.id}">${u.name}</option>`)
+  const prevTopic = el.taskTopic.value;
+  const prevAssignee = el.taskAssignee.value;
+  const topics = STATE.catalog.topics;
+  el.taskTopic.innerHTML = topics.map((topic) => `<option value="${escapeAttr(topic)}">${escapeHtml(topic)}</option>`).join("");
+  const performerOptions = getPerformers()
+    .map((u) => `<option value="${escapeAttr(u.id)}">${escapeHtml(u.name)}</option>`)
     .join("");
   el.taskAssignee.innerHTML = performerOptions;
+  if (topics.includes(prevTopic)) el.taskTopic.value = prevTopic;
+  else if (topics.length) el.taskTopic.value = topics[0];
+  const performers = getPerformers();
+  if (performers.some((p) => p.id === prevAssignee)) el.taskAssignee.value = prevAssignee;
+  else if (performers.length) el.taskAssignee.value = performers[0].id;
+  updateInviteHint();
 }
 
 function fillRoleSwitcher() {
-  el.roleSwitchSelect.innerHTML = USERS.map(
-    (user) =>
-      `<option value="${user.id}">${user.name} (${user.role === "manager" ? "руководитель" : "исполнитель"})</option>`,
-  ).join("");
+  el.roleSwitchSelect.innerHTML = getAllUsers()
+    .map(
+      (user) =>
+        `<option value="${escapeAttr(user.id)}">${escapeHtml(user.name)} (${user.role === "manager" ? "руководитель" : "исполнитель"})</option>`,
+    )
+    .join("");
 }
 
 function bindEvents() {
   el.sendTaskBtn.addEventListener("click", createTaskFromForm);
   el.recordBtn.addEventListener("click", startVoiceRecognition);
   el.roleSwitchBtn.addEventListener("click", switchRole);
+  el.topicPlus.addEventListener("click", addTopic);
+  el.topicMinus.addEventListener("click", removeSelectedTopic);
+  el.performerPlus.addEventListener("click", addPerformer);
+  el.performerMinus.addEventListener("click", removeSelectedPerformer);
+  el.taskAssignee.addEventListener("change", updateInviteHint);
   el.filterButtons.forEach((btn) =>
     btn.addEventListener("click", () => {
       STATE.filter = btn.dataset.filter;
@@ -87,11 +159,118 @@ function bindEvents() {
   );
 }
 
+function addTopic() {
+  const text = el.newTopicInput.value.trim();
+  if (!text) {
+    showMessage("Введите текст темы.", "error");
+    return;
+  }
+  if (STATE.catalog.topics.includes(text)) {
+    showMessage("Такая тема уже есть.", "error");
+    return;
+  }
+  STATE.catalog.topics.push(text);
+  saveCatalog();
+  el.newTopicInput.value = "";
+  fillSelects();
+  el.taskTopic.value = text;
+  showMessage("Тема добавлена.", "info");
+}
+
+function addPerformer() {
+  const name = el.newPerformerInput.value.trim();
+  if (!name) {
+    showMessage("Введите ФИО исполнителя.", "error");
+    return;
+  }
+  const id = `perf_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+  const token = `inv-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+  STATE.catalog.performers.push({ id, name, token });
+  saveCatalog();
+  el.newPerformerInput.value = "";
+  fillSelects();
+  fillRoleSwitcher();
+  el.taskAssignee.value = id;
+  updateInviteHint();
+  showMessage("Исполнитель добавлен. Ссылка: ?invite=" + token, "info");
+}
+
+function removeSelectedTopic() {
+  const topic = el.taskTopic.value;
+  if (!topic) return;
+  if (STATE.tasks.some((t) => t.topic === topic)) {
+    showMessage("Эту тему нельзя удалить: есть задачи с этой темой.", "error");
+    return;
+  }
+  if (STATE.catalog.topics.length <= 1) {
+    showMessage("Должна остаться хотя бы одна тема.", "error");
+    return;
+  }
+  const index = STATE.catalog.topics.indexOf(topic);
+  if (index === -1) return;
+  STATE.catalog.topics.splice(index, 1);
+  saveCatalog();
+  fillSelects();
+  showMessage("Тема удалена.", "info");
+}
+
+function removeSelectedPerformer() {
+  const performerId = el.taskAssignee.value;
+  if (!performerId) return;
+  if (STATE.tasks.some((t) => t.currentAssigneeId === performerId)) {
+    showMessage("Нельзя удалить исполнителя: есть активные задачи на него.", "error");
+    return;
+  }
+  if (STATE.catalog.performers.length <= 1) {
+    showMessage("Должен остаться хотя бы один исполнитель.", "error");
+    return;
+  }
+  STATE.catalog.performers = STATE.catalog.performers.filter((p) => p.id !== performerId);
+  saveCatalog();
+  fillSelects();
+  fillRoleSwitcher();
+  if (STATE.currentUser.id === performerId) {
+    STATE.currentUser = MANAGER;
+    updateInviteInUrl(MANAGER.token);
+  }
+  renderApp();
+  showMessage("Исполнитель удалён.", "info");
+}
+
+function updateInviteHint() {
+  if (!el.assigneeInviteHint) return;
+  if (STATE.currentUser.role !== "manager") {
+    el.assigneeInviteHint.textContent = "";
+    return;
+  }
+  const id = el.taskAssignee.value;
+  const performer = getPerformers().find((p) => p.id === id);
+  el.assigneeInviteHint.textContent = performer ? `Ссылка исполнителя: ?invite=${performer.token}` : "";
+}
+
+function showMessage(text, type = "error") {
+  if (!el.appMessages) return;
+  clearTimeout(messageTimer);
+  el.appMessages.innerHTML = "";
+  const div = document.createElement("div");
+  div.className = `message message-${type}`;
+  div.textContent = text;
+  el.appMessages.appendChild(div);
+  messageTimer = setTimeout(() => {
+    el.appMessages.innerHTML = "";
+  }, 8000);
+}
+
 function createTaskFromForm() {
   if (STATE.currentUser.role !== "manager") return;
+  const performers = getPerformers();
+  if (!performers.length) {
+    showMessage("Добавьте хотя бы одного исполнителя в справочнике.", "error");
+    return;
+  }
   const text = el.taskText.value.trim();
   if (!text) {
-    alert("Введите или продиктуйте текст задачи.");
+    showMessage("Введите или продиктуйте текст задачи.", "error");
     return;
   }
   const topic = el.taskTopic.value;
@@ -122,7 +301,7 @@ function createTaskFromForm() {
 function startVoiceRecognition() {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) {
-    alert("В браузере нет поддержки голосового ввода.");
+    showMessage("В этом браузере нет поддержки голосового ввода.", "error");
     return;
   }
   const recognition = new Recognition();
@@ -139,8 +318,10 @@ function startVoiceRecognition() {
     autoPickTopicAndAssignee(transcript);
     el.recordStatus.textContent = "Готово: текст распознан.";
   };
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
+    const code = event.error || "unknown";
     el.recordStatus.textContent = "Ошибка распознавания.";
+    showMessage(`Ошибка распознавания речи: ${code}`, "error");
   };
   recognition.onend = () => {
     if (!el.recordStatus.textContent) {
@@ -150,18 +331,22 @@ function startVoiceRecognition() {
 }
 
 function autoPickTopicAndAssignee(text) {
-  const lower = text.toLowerCase();
-  let pickedTopic = TOPICS[0];
-  if (lower.includes("трактар") || lower.includes("мотор")) pickedTopic = TOPICS[1];
-  if (lower.includes("посе")) pickedTopic = TOPICS[2];
-  if (lower.includes("двер") || lower.includes("иных земель")) pickedTopic = TOPICS[3];
-  if (lower.includes("навоз") || lower.includes("скот")) pickedTopic = TOPICS[0];
-  el.taskTopic.value = pickedTopic;
+  const topics = STATE.catalog.topics;
+  if (!topics.length) return;
 
-  const performer = USERS.find(
-    (u) => u.role === "performer" && lower.includes(u.name.split(" ")[0].toLowerCase()),
-  );
-  el.taskAssignee.value = performer ? performer.id : USERS.find((u) => u.role === "performer").id;
+  const lower = text.toLowerCase();
+  let pickedTopic = topics[0];
+  if (topics[1] && (lower.includes("трактар") || lower.includes("мотор"))) pickedTopic = topics[1];
+  if (topics[2] && lower.includes("посе")) pickedTopic = topics[2];
+  if (topics[3] && (lower.includes("двер") || lower.includes("иных земель"))) pickedTopic = topics[3];
+  if (topics[0] && (lower.includes("навоз") || lower.includes("скот"))) pickedTopic = topics[0];
+  if (topics.includes(pickedTopic)) el.taskTopic.value = pickedTopic;
+
+  const performers = getPerformers();
+  const performer = performers.find((u) => lower.includes(u.name.split(" ")[0].toLowerCase()));
+  if (performers.length) {
+    el.taskAssignee.value = performer ? performer.id : performers[0].id;
+  }
 }
 
 function renderApp() {
@@ -170,17 +355,19 @@ function renderApp() {
   el.roleSwitchSelect.value = user.id;
   el.quickCreateScreen.classList.toggle("hidden", user.role !== "manager");
   el.tasksTitle.textContent = user.role === "manager" ? "Список задач руководителя" : "Мои задачи";
+  if (user.role === "manager") updateInviteHint();
   renderTaskList();
   renderTaskDetails();
 }
 
 function switchRole() {
   const userId = el.roleSwitchSelect.value;
-  const user = USERS.find((candidate) => candidate.id === userId);
+  const user = getAllUsers().find((candidate) => candidate.id === userId);
   if (!user) return;
   STATE.currentUser = user;
   STATE.selectedTaskId = null;
   updateInviteInUrl(user.token);
+  if (user.role === "manager") fillSelects();
   renderApp();
 }
 
@@ -235,15 +422,15 @@ function renderTaskDetails() {
   }
   el.taskDetails.className = "details";
   const historyItems = task.history
-    .map((entry) => `<li>${formatDate(entry.at)} - ${entry.message}</li>`)
+    .map((entry) => `<li>${formatDate(entry.at)} - ${escapeHtml(entry.message)}</li>`)
     .join("");
   el.taskDetails.innerHTML = `
     <div class="details-grid">
       <div><b>Текст:</b> ${escapeHtml(task.text)}</div>
       <div><b>Тема:</b> ${escapeHtml(task.topic)}</div>
-      <div><b>Инициатор:</b> ${resolveUserName(task.managerId)}</div>
-      <div><b>Текущий исполнитель:</b> ${resolveUserName(task.currentAssigneeId)}</div>
-      <div><b>Статус:</b> ${task.status}</div>
+      <div><b>Инициатор:</b> ${escapeHtml(resolveUserName(task.managerId))}</div>
+      <div><b>Текущий исполнитель:</b> ${escapeHtml(resolveUserName(task.currentAssigneeId))}</div>
+      <div><b>Статус:</b> ${escapeHtml(task.status)}</div>
       <div><b>История:</b><ol class="history-list">${historyItems}</ol></div>
     </div>
     <div class="details-actions" id="details-actions"></div>
@@ -275,11 +462,56 @@ function renderActionsForTask(task) {
     markDone.addEventListener("click", () => updateStatus(task.id, "completed"));
     actionsHost.appendChild(markDone);
 
-    const delegateBtn = document.createElement("button");
-    delegateBtn.textContent = "Делегировать";
-    delegateBtn.addEventListener("click", () => delegateTask(task.id));
-    actionsHost.appendChild(delegateBtn);
+    const others = getPerformers().filter((p) => p.id !== task.currentAssigneeId);
+    if (!others.length) {
+      const note = document.createElement("p");
+      note.className = "task-meta";
+      note.textContent = "Нет других исполнителей для передачи задачи.";
+      actionsHost.appendChild(note);
+    } else {
+      const wrap = document.createElement("div");
+      wrap.className = "delegate-row";
+      const lab = document.createElement("label");
+      lab.textContent = "Передать задачу";
+      lab.setAttribute("for", `delegate-select-${task.id}`);
+      const sel = document.createElement("select");
+      sel.id = `delegate-select-${task.id}`;
+      others.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+      });
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Передать";
+      btn.addEventListener("click", () => performDelegate(task.id, sel.value));
+      wrap.appendChild(lab);
+      wrap.appendChild(sel);
+      wrap.appendChild(btn);
+      actionsHost.appendChild(wrap);
+    }
   }
+}
+
+function performDelegate(taskId, newAssigneeId) {
+  const task = STATE.tasks.find((t) => t.id === taskId);
+  if (!task || STATE.currentUser.role !== "performer") return;
+  const target = getPerformers().find((p) => p.id === newAssigneeId);
+  if (!target || target.id === task.currentAssigneeId) {
+    showMessage("Выберите другого исполнителя.", "error");
+    return;
+  }
+  task.currentAssigneeId = target.id;
+  task.history.unshift({
+    type: "delegated",
+    byUserId: STATE.currentUser.id,
+    at: new Date().toISOString(),
+    message: `Делегировано исполнителю: ${target.name}`,
+  });
+  saveTasks();
+  showMessage(`Задача передана: ${target.name}`, "info");
+  renderApp();
 }
 
 function cancelTask(taskId) {
@@ -291,25 +523,6 @@ function cancelTask(taskId) {
     byUserId: STATE.currentUser.id,
     at: new Date().toISOString(),
     message: "Задача отменена руководителем",
-  });
-  saveTasks();
-  renderApp();
-}
-
-function delegateTask(taskId) {
-  const task = STATE.tasks.find((t) => t.id === taskId);
-  if (!task || STATE.currentUser.role !== "performer") return;
-  const choices = USERS.filter((u) => u.role === "performer" && u.id !== task.currentAssigneeId);
-  const choicesText = choices.map((u, i) => `${i + 1}. ${u.name}`).join("\n");
-  const selected = prompt(`Кому делегировать?\n${choicesText}`);
-  const index = Number(selected) - 1;
-  if (Number.isNaN(index) || !choices[index]) return;
-  task.currentAssigneeId = choices[index].id;
-  task.history.unshift({
-    type: "delegated",
-    byUserId: STATE.currentUser.id,
-    at: new Date().toISOString(),
-    message: `Делегировано исполнителю: ${choices[index].name}`,
   });
   saveTasks();
   renderApp();
@@ -331,7 +544,7 @@ function updateStatus(taskId, status) {
 }
 
 function resolveUserName(userId) {
-  const user = USERS.find((u) => u.id === userId);
+  const user = getAllUsers().find((u) => u.id === userId);
   return user ? user.name : "Неизвестный";
 }
 
@@ -359,10 +572,18 @@ function formatDate(iso) {
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeAttr(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
