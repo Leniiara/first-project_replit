@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>V1 - Управление задачами руководителя</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Управление задачами руководителя</h1>
+      <p id="user-badge" class="user-badge"></p>
+    </header>
+
+    <main class="layout">
+      <section id="quick-create-screen" class="card hidden">
+        <h2>Быстрая постановка задачи</h2>
+        <p class="hint">2 действия: записать голос -> отправить задачу.</p>
+        <div class="row">
+          <button id="record-btn" class="primary" type="button">Записать голос</button>
+          <span id="record-status" class="status"></span>
+        </div>
+        <label for="task-text">Текст задачи</label>
+        <textarea id="task-text" rows="3" placeholder="Текст появится после распознавания речи..."></textarea>
+
+        <label for="task-topic">Тема</label>
+        <select id="task-topic"></select>
+
+        <label for="task-assignee">Исполнитель</label>
+        <select id="task-assignee"></select>
+
+        <button id="send-task-btn" class="primary" type="button">Отправить задачу</button>
+      </section>
+
+      <section id="tasks-screen" class="card">
+        <h2 id="tasks-title">Задачи</h2>
+        <div class="filters">
+          <button class="filter-btn active" data-filter="active" type="button">Активные</button>
+          <button class="filter-btn" data-filter="completed" type="button">Выполненные</button>
+          <button class="filter-btn" data-filter="cancelled" type="button">Отмененные</button>
+        </div>
+        <ul id="tasks-list" class="tasks-list"></ul>
+      </section>
+
+      <section id="task-details-screen" class="card">
+        <h2>Детали и история</h2>
+        <div id="task-details" class="details empty">Выберите задачу из списка.</div>
+      </section>
+    </main>
+
+    <template id="task-item-template">
+      <li class="task-item">
+        <button type="button" class="task-open"></button>
+        <span class="task-meta"></span>
+      </li>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
