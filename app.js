@@ -24,6 +24,8 @@ const STATE = {
 
 const el = {
   userBadge: document.getElementById("user-badge"),
+  roleSwitchSelect: document.getElementById("role-switch-select"),
+  roleSwitchBtn: document.getElementById("role-switch-btn"),
   quickCreateScreen: document.getElementById("quick-create-screen"),
   taskText: document.getElementById("task-text"),
   taskTopic: document.getElementById("task-topic"),
@@ -44,6 +46,7 @@ function init() {
   STATE.currentUser = resolveUserFromInvite();
   STATE.tasks = loadTasks();
   fillSelects();
+  fillRoleSwitcher();
   bindEvents();
   renderApp();
 }
@@ -64,9 +67,17 @@ function fillSelects() {
   el.taskAssignee.innerHTML = performerOptions;
 }
 
+function fillRoleSwitcher() {
+  el.roleSwitchSelect.innerHTML = USERS.map(
+    (user) =>
+      `<option value="${user.id}">${user.name} (${user.role === "manager" ? "руководитель" : "исполнитель"})</option>`,
+  ).join("");
+}
+
 function bindEvents() {
   el.sendTaskBtn.addEventListener("click", createTaskFromForm);
   el.recordBtn.addEventListener("click", startVoiceRecognition);
+  el.roleSwitchBtn.addEventListener("click", switchRole);
   el.filterButtons.forEach((btn) =>
     btn.addEventListener("click", () => {
       STATE.filter = btn.dataset.filter;
@@ -156,10 +167,27 @@ function autoPickTopicAndAssignee(text) {
 function renderApp() {
   const user = STATE.currentUser;
   el.userBadge.textContent = `Пользователь: ${user.name} (${user.role === "manager" ? "руководитель" : "исполнитель"})`;
+  el.roleSwitchSelect.value = user.id;
   el.quickCreateScreen.classList.toggle("hidden", user.role !== "manager");
   el.tasksTitle.textContent = user.role === "manager" ? "Список задач руководителя" : "Мои задачи";
   renderTaskList();
   renderTaskDetails();
+}
+
+function switchRole() {
+  const userId = el.roleSwitchSelect.value;
+  const user = USERS.find((candidate) => candidate.id === userId);
+  if (!user) return;
+  STATE.currentUser = user;
+  STATE.selectedTaskId = null;
+  updateInviteInUrl(user.token);
+  renderApp();
+}
+
+function updateInviteInUrl(token) {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("invite", token);
+  window.history.replaceState({}, "", nextUrl.toString());
 }
 
 function visibleTasksForUser() {
